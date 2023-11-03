@@ -43,11 +43,12 @@ void insert_pfifo(PriorityFIFO* pfifo, int id, int priority)
 
    mutex_lock(&pfifo->mutex);
 
-   while (full_pfifo(pfifo)) {
+   while (full_pfifo(pfifo)) { // até que encha
       cond_wait(&pfifo->cond_not_full, &pfifo->mutex);
    }
 
    require (!full_pfifo(pfifo), "full FIFO");  // IMPORTANT: in a shared fifo, it may not result from a program error!
+   // verificado que está cheio por isso prossegue
 
    //printf("[insert_pfifo] value=%d, priority=%d, pfifo->inp=%d, pfifo->out=%d\n", id, priority, pfifo->inp, pfifo->out);
 
@@ -66,7 +67,7 @@ void insert_pfifo(PriorityFIFO* pfifo, int id, int priority)
    pfifo->inp = (pfifo->inp + 1) % FIFO_MAXSIZE;
    pfifo->cnt++;
    //printf("[insert_pfifo] pfifo->inp=%d, pfifo->out=%d\n", pfifo->inp, pfifo->out);
-   cond_broadcast(&pfifo->cond_not_empty);
+   cond_broadcast(&pfifo->cond_not_empty); // broadcast de que é preciso agora esvaziar
    mutex_unlock(&pfifo->mutex);   
 }
 
@@ -79,11 +80,12 @@ int retrieve_pfifo(PriorityFIFO* pfifo)
 
    mutex_lock(&pfifo->mutex);
 
-   while(empty_pfifo(pfifo)){
+   while(empty_pfifo(pfifo)){ // receção do broadcast e posterior verificação do esvaziamento do fifo
       cond_wait(&pfifo->cond_not_empty, &pfifo->mutex);
    }
 
    require (!empty_pfifo(pfifo), "empty FIFO");       // IMPORTANT: in a shared fifo, it may not result from a program error!
+   // como o fifo está então vazio, o código prossegue
 
    check_valid_patient_id(pfifo->array[pfifo->out].id);
    check_valid_priority(pfifo->array[pfifo->out].priority);
@@ -105,7 +107,7 @@ int retrieve_pfifo(PriorityFIFO* pfifo)
 
    ensure ((result >= 0 && result <= MAX_ID) || result == DUMMY_ID, "invalid id");  // a false value indicates a program error
 
-   cond_broadcast(&pfifo->cond_not_full);
+   cond_broadcast(&pfifo->cond_not_full); // broadcast que precisa de encher o fifo
    mutex_unlock(&pfifo->mutex);  
 
    return result;

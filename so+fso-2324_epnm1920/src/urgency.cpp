@@ -49,6 +49,7 @@ typedef struct
    int done; // 0: waiting for consultation; 1: consultation finished
    pthread_mutex_t mutex;
    pthread_cond_t cond;// TODO point: if necessary, add new fields here
+   // é necessário associar um mutex e um cond para os pacientes, já que será preciso realizar operações que necessitem destes elementos
 } Patient;
 
 typedef struct
@@ -92,7 +93,7 @@ void init_simulation(int np)
    for (int i = 0; i < npatients; i++) {
       mutex_init(&hd->all_patients[i].mutex, NULL);
       cond_init(&hd->all_patients[i].cond, NULL);
-   }
+   } // simples inicialização dos mutex e cond para cada paciente do fifo hd
 }
 
 /* ************************************************* */
@@ -109,7 +110,7 @@ void term_simulation(int np) {
    for (int i = 0; i < npatients; i++) {
       mutex_destroy(&hd->all_patients[i].mutex);
       cond_destroy(&hd->all_patients[i].cond);
-   }
+   } // // simples terminalização dos mutex e cond para cada paciente do fifo hd
 
    free(hd);
    hd = NULL;
@@ -128,7 +129,7 @@ int nurse_iteration(int id) // return value can be used to request termination
 
    if (patient == DUMMY_ID) {
       return 1;
-   }
+   } // condição de paragem para que uma nurse perceba que já não há mais pacientes
 
    printf("\e[34;01mNurse %d: evaluate patient %d priority\e[0m\n", id, patient);
    int priority = random_manchester_triage_priority();
@@ -151,7 +152,7 @@ int doctor_iteration(int id) // return value can be used to request termination
 
    if (patient == DUMMY_ID) {
       return 1;
-   }
+   } // condição de paragem para que um doctor perceba que já não há mais pacientes
 
    printf("\e[32;01mDoctor %d: treat patient %d\e[0m\n", id, patient);
    random_wait();
@@ -161,7 +162,7 @@ int doctor_iteration(int id) // return value can be used to request termination
    hd->all_patients[patient].done = 1;
    cond_broadcast(&hd->all_patients[patient].cond);
    mutex_unlock(&hd->all_patients[patient].mutex);
-
+   // é preciso verificar se os pacientes já acabaram a consulta para então poderem desocupar o espaço que estão a ocupar
    return 0;
 }
 
@@ -185,7 +186,7 @@ void patient_wait_end_of_consultation(int id)
 
    while(hd->all_patients[id].done == 0) {
       cond_wait(&hd->all_patients[id].cond, &hd->all_patients[id].mutex);
-   }
+   } // aqui estamos a verificar se o paciente ainda se encontra em consulta e só depois de fazer a verificação é que se garante que já foi tratado
 
    printf("\e[30;01mPatient %s (number %d): health problems treated\e[0m\n", hd->all_patients[id].name, id);
 
@@ -224,7 +225,7 @@ void* doctor_main(void* arg) {
    return NULL;
 }
 
-
+// 3 threads simples em que, passando o argumento id de cada pessoa, vamos verificar em que estado estão (disponível, indisponível, consulta ou á espera)
 
 /* ************************************************* */
 
@@ -280,8 +281,8 @@ int main(int argc, char *argv[])
    // active entities and code to properly terminate the simulation.
    /* dummy code to show a very simple sequential behavior */
 
-   pthread_t p[npatients], n[nnurses], d[ndoctors];
-   int p_id[npatients], n_id[nnurses], d_id[ndoctors];
+   pthread_t p[npatients], n[nnurses], d[ndoctors]; // criação das threads que serão para cada paciente/nurse/doctor 
+   int p_id[npatients], n_id[nnurses], d_id[ndoctors]; // criação de arrays que guardarão o id individual de cada paciente/nurse/doctor
 
    for (int i = 0; i < npatients; i++) {
       p_id[i] = i;
@@ -302,7 +303,7 @@ int main(int argc, char *argv[])
       thread_join(p[i], NULL);
    }
 
-   for (int i = 0; i < npatients; i++) {
+   for (int i = 0; i < npatients; i++) { // tem de ser por esta ordem já que temos de registar primeiro todos os pacientes e só depois é que podemos prosseguir com as ações
       insert_pfifo(&hd->doctor_queue, DUMMY_ID, MAX_PRIORITY);
    }
 
